@@ -107,6 +107,20 @@ def origin_at(segment, hypothesis, slots, frame, xy):
         geometry[j] = _arc(slots[j], slots[i], phase, bulge)
     return int(np.argmin(np.linalg.norm(geometry - xy, axis=1)))
 
+def permutations_for(segment, rows, slots, anchor):
+    """按历史观测所在时刻修正换位候选的出发槽位。"""
+    index, xy, source_slot = anchor
+    weights = {}
+    for row in rows:
+        permutation = list(row["perm"])
+        if segment.start < index < segment.stop:
+            origin = origin_at(segment, row, slots, index, xy)
+            permutation[source_slot], permutation[origin] = permutation[origin], permutation[source_slot]
+        key = tuple(permutation)
+        weights[key] = weights.get(key, 0.0) + row["weight"]
+    return weights
+
+
 def segment_evidence(segment: MotionSegment, detections, slots, option) -> dict:
     """量化首选假设无法解释的离槽观测，独立于候选之间的相对差异。"""
     outside_count = 0

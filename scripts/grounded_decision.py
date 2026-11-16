@@ -1,18 +1,18 @@
 """从放置任务的可见历史生成带定位的操作子目标。"""
 
 import json
+from bisect import bisect_left
 
 import cv2
 import numpy as np
 
-from place_diagnostic.exchange_detection import find_motion_segments, score_segment
-from place_diagnostic.permutation_memory import target_distribution
+from place_diagnostic.exchange_detection import find_motion_segments, permutations_for, score_segment
+from place_diagnostic.permutation_memory import exchange_record, target_distribution
 from place_diagnostic.place_events import (
-    cube_centers, detect_placement, empty_closure_anchor, goal_conditions,
+    candidate_frame_indices, cube_centers, detect_placement, empty_closure_anchor, goal_conditions,
     read_placement, read_relevant_recent, release_candidates,
 )
 from place_diagnostic.ring_association import associate, detect_rings
-from run_exchange_memory import exchange_record, permutations_for
 
 
 def choose_with_model(client, goal, anchor, events, frames):
@@ -38,10 +38,10 @@ def choose_with_model(client, goal, anchor, events, frames):
     return events[event_id]
 
 
-def ring_localizers(frames, stride):
+def ring_localizers(frames, stride, *, sampled_indices=None):
     """同一张图像和相同采样间隔，分别按逐帧和换位片段追踪。"""
     cutoff = len(frames) - 1
-    ids = [*range(0, cutoff, stride), cutoff]
+    ids = [*range(0, cutoff, stride), cutoff] if sampled_indices is None else sampled_indices
     rgb = {index: cv2.cvtColor(frames[index], cv2.COLOR_BGR2RGB) for index in ids}
     rings = {index: detect_rings(frame) for index, frame in rgb.items()}
     slots = rings[0]
@@ -74,15 +74,38 @@ def ring_localizers(frames, stride):
     return locate, len(ids)
 
 
-def grounded_place(frames, aperture, goal, fps, stride, model=None, *, model_reader="deepseek"):
+def nearby_evidence(indices, expected, *, lower, upper):
+    """在已保留的帧中找最近证据，最大允许两帧差，并保持释放两侧互斥。"""
+    retained = set()
+    for frame in expected:
+        at = bisect_left(indices, frame)
+        nearby = [i for i in indices[max(0, at - 1):at + 1] if lower <= i < upper and abs(i - frame) <= 2]
+        if nearby:
+            retained.add(min(nearby, key=lambda i: (abs(i - frame), i)))
+    return sorted(retained)
+
+
+def grounded_place(frames, aperture, goal, fps, stride, model=None, *, model_reader="deepseek", sampled_indices=None):
     """只使用已看到的相机和夹爪观测，分别返回两个读法和两个定位法的结果。"""
     cutoff = len(frames) - 1
     if cutoff < 1 or len(aperture) != cutoff or stride < 1:
         raise ValueError("画面须读到决策帧，夹爪历史须在该帧之前结束")
     color, _, relation = goal_conditions(goal)
     releases = list(release_candidates(aperture))
-    events = [event for close, release in releases
-              if (event := detect_placement(lambda t: frames[t], close, release, cutoff)) is not None]
+    evidence = None
+    if sampled_indices is not None:
+        if (not len(sampled_indices) or sampled_indices[0] != 0 or sampled_indices[-1] != cutoff or
+                any(a >= b for a, b in zip(sampled_indices, sampled_indices[1:]))):
+            raise ValueError("保留帧须严格递增并覆盖首帧与决策帧")
+    events = []
+    for close, release in releases:
+        if sampled_indices is not None:
+            before, after = candidate_frame_indices(close, release, cutoff)
+            evidence = (nearby_evidence(sampled_indices, before, lower=0, upper=release),
+                        nearby_evidence(sampled_indices, after, lower=release + 6, upper=release + 19))
+        event = detect_placement(lambda t: frames[t], close, release, cutoff, evidence_frames=evidence)
+        if event is not None:
+            events.append(event)
     anchor = empty_closure_anchor(aperture, releases, fps) if relation else None
     readers = {"latest_object": read_relevant_recent(events, goal),
                "object_and_time": read_placement(events, goal, anchor)}
@@ -94,7 +117,7 @@ def grounded_place(frames, aperture, goal, fps, stride, model=None, *, model_rea
                 readers[model_reader] = choose_with_model(model, goal, anchor, events, frames)
             except (RuntimeError, ValueError) as error:
                 model_error = {"type": type(error).__name__, "message": str(error)}
-    locate, frame_count = ring_localizers(frames, stride)
+    locate, frame_count = ring_localizers(frames, stride, sampled_indices=sampled_indices)
     current_colors = cube_centers(cv2.cvtColor(frames[-1], cv2.COLOR_BGR2HSV))
     source = current_colors[color].tolist() if color in current_colors else None
     results = {}

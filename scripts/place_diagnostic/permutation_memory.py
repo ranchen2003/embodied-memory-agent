@@ -48,6 +48,12 @@ class Exchange:
         return matrix
 
 
+def exchange_record(segment, alternatives, extra_frames=(), residual=0.0):
+    """将新识别到的换位整理成统一内存记录。"""
+    return Exchange(segment.start, segment.stop, tuple(alternatives), tuple(alternatives.values()),
+                    tuple(extra_frames), residual)
+
+
 def target_distribution(slot_count: int, source_slot: int, exchanges: Sequence[Exchange], commit=False):
     """沿时间传播指定圆环所在槽位的权重。"""
     state = np.zeros(slot_count)

@@ -9,9 +9,9 @@ import cv2
 import numpy as np
 
 from offline_pilot import REVISION, ROOT
-from place_diagnostic.exchange_detection import find_motion_segments, origin_at, score_segment, segment_evidence
+from place_diagnostic.exchange_detection import find_motion_segments, permutations_for, score_segment, segment_evidence
 from place_diagnostic.global_ring_tracking import global_associate
-from place_diagnostic.permutation_memory import Exchange, read_with_budget, target_distribution
+from place_diagnostic.permutation_memory import exchange_record, read_with_budget, target_distribution
 from place_diagnostic.ring_association import associate, detect_rings
 
 
@@ -33,24 +33,6 @@ def read_prefix(path, cutoff):
     finally:
         capture.release()
     return frames
-
-
-def permutations_for(segment, rows, slots, anchor):
-    index, xy, source_slot = anchor
-    weights = {}
-    for row in rows:
-        permutation = list(row["perm"])
-        if segment.start < index < segment.stop:
-            origin = origin_at(segment, row, slots, index, xy)
-            permutation[source_slot], permutation[origin] = permutation[origin], permutation[source_slot]
-        key = tuple(permutation)
-        weights[key] = weights.get(key, 0.0) + row["weight"]
-    return weights
-
-
-def exchange_record(segment, alternatives, extra_frames=(), residual=0.0):
-    return Exchange(segment.start, segment.stop, tuple(alternatives), tuple(alternatives.values()),
-                    tuple(extra_frames), residual)
 
 
 def compose_alternatives(before, after):

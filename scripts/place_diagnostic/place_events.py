@@ -79,9 +79,12 @@ def candidate_frame_indices(close, release, decision_frame):
     return before_frames, after_frames
 
 
-def detect_placement(frame_at, close, release, decision_frame):
+def detect_placement(frame_at, close, release, decision_frame, *, evidence_frames=None):
     """用方块位移和释放后圆环的可见证据确认候选。"""
-    before_frames, after_frames = candidate_frame_indices(close, release, decision_frame)
+    before_frames, after_frames = (
+        candidate_frame_indices(close, release, decision_frame)
+        if evidence_frames is None else evidence_frames
+    )
     before = [cube_centers(cv2.cvtColor(frame_at(index), cv2.COLOR_BGR2HSV)) for index in before_frames]
     after = []
     for index in after_frames:
