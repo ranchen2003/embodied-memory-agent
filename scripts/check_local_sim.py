@@ -45,6 +45,8 @@ def run_check(args, result):
         "PickCube-v1",
         num_envs=1,
         sim_backend="cpu",
+        # Windows 上用 CPU 路径读回图像，避开 CUDA 相机数据转换。
+        render_backend="cpu",
         obs_mode="rgb",
         render_mode="rgb_array",
         control_mode="pd_joint_delta_pos",
@@ -118,6 +120,7 @@ def main():
     result = {
         "environment": "PickCube-v1",
         "simulation_backend": "cpu",
+        "render_backend": "cpu",
         "control_mode": "pd_joint_delta_pos",
         "seed": args.seed,
         "requested_steps": args.steps,

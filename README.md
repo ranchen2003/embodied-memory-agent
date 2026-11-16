@@ -22,3 +22,13 @@ python scripts/offline_pilot.py --work-dir ../experiments --budget 24
 | `../experiments/runs/` | 自动生成的结果和逐回合记录 |
 
 Git 记录脚本、依赖与实验说明。数据、权重、运行产物和本机密钥通过 `.gitignore` 保留在本机。正式评测计划覆盖 RoboMME-Plus 的全部 16 个任务与 800 个固定测试回合。[基准协议](https://robomme.github.io/plus.html)
+
+## Windows 单环境仿真验证
+
+`scripts/check_local_sim.py` 在 ManiSkill 的 `PickCube-v1` 上重置 Panda 环境，发送关节指令并检查新观测和实际关节位移。验证配置使用 ManiSkill 3.0.1、SAPIEN 3.0.3、CPU 物理仿真和 CPU 图像读回。实验环境位于 `../experiments/envs/maniskill-win`，命令从源码仓库根目录运行。
+
+```powershell
+..\experiments\envs\maniskill-win\Scripts\python.exe scripts/check_local_sim.py --output ../experiments/runs/local-sim --save-image
+```
+
+运行会记录版本、关节位移、RGB 形状和耗时。该检查覆盖本机的观测与动作接口，官方 Plus 全量和任务完成率由独立闭环评测验证。[ManiSkill 平台支持](https://maniskill.readthedocs.io/en/latest/user_guide/getting_started/installation.html#system-support)
