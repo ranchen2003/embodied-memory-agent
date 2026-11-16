@@ -17,11 +17,25 @@ python scripts/offline_pilot.py --work-dir ../experiments --budget 24
 | 路径 | 内容 |
 |---|---|
 | `scripts/offline_pilot.py` | 读取示范历史并运行等帧数对照 |
+| `scripts/run_place_diagnostic.py` | 分开评价证据保留、历史事件读取和当前落点 |
 | `docs/first-month.md` | 已有结果、实验口径和组会计划 |
+| `docs/first-month-results.md` | 本机抓放、逐项对照和阶段自评 |
 | `../experiments/data/` | 自动生成的公开轨迹缓存 |
 | `../experiments/runs/` | 自动生成的结果和逐回合记录 |
 
 Git 记录脚本、依赖与实验说明。数据、权重、运行产物和本机密钥通过 `.gitignore` 保留在本机。正式评测计划覆盖 RoboMME-Plus 的全部 16 个任务与 800 个固定测试回合。[基准协议](https://robomme.github.io/plus.html)
+
+## 历史放置和当前圆环
+
+在同六条公开开发轨迹上复跑历史放置诊断。脚本缓存前视视频和任务指令，预测读取到第一帧执行画面为止。开发标注的角色和负结果见[本阶段结果](docs/first-month-results.md)。
+
+```powershell
+python -m pip install -r requirements-vision.txt
+python scripts/run_place_diagnostic.py --work-dir ../experiments --stride 1
+python scripts/run_place_diagnostic.py --work-dir ../experiments --stride 2
+```
+
+结果保存到 `../experiments/runs/place-diagnostic/stride_*/trace.json`，逐例记录保留帧、事件、时间条件、落点、候选排序和误差。
 
 ## Windows 单环境仿真验证
 
@@ -32,3 +46,10 @@ Git 记录脚本、依赖与实验说明。数据、权重、运行产物和本�
 ```
 
 运行会记录版本、关节位移、RGB 形状和耗时。该检查覆盖本机的观测与动作接口，官方 Plus 全量和任务完成率由独立闭环评测验证。[ManiSkill 平台支持](https://maniskill.readthedocs.io/en/latest/user_guide/getting_started/installation.html#system-support)
+
+以下两个命令检查完整抓放和原版 PickCube 目标。两者均使用仿真状态辅助控制，结果可用于定位执行器的问题。
+
+```powershell
+..\experiments\envs\maniskill-win\Scripts\python.exe scripts/sim_pick_place.py --output ../experiments/runs/local-pick-place
+..\experiments\envs\maniskill-win\Scripts\python.exe scripts/sim_pick_place.py --native-goal --output ../experiments/runs/local-pick-place/native
+```
