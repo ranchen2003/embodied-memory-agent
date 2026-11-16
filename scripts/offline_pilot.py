@@ -1,4 +1,4 @@
-"""Inspect frame retention on public RoboMME-Plus demonstration histories."""
+"""在 RoboMME-Plus 公开示范中对比等帧数的历史保留方式。"""
 
 import argparse
 import csv
@@ -18,8 +18,8 @@ LABELS = {"press the button", "drop the cube onto target"}
 METHODS = ("recent", "uniform", "state_change")
 
 
-def cache_file(session, name):
-    path = ROOT / "data" / name
+def cache_file(session, work_dir, name):
+    path = work_dir / "data" / name.removeprefix("data/")
     if not path.exists():
         response = session.get(f"{SOURCE}/{name}", timeout=(10, 30))
         response.raise_for_status()
@@ -34,7 +34,7 @@ def demonstration(table):
     demo = table["is_video_demo"].to_numpy()
     stop = int(np.count_nonzero(demo))
     if not 0 < stop < len(demo) or not demo[:stop].all():
-        raise ValueError("Expected a contiguous demonstration followed by execution")
+        raise ValueError("轨迹应包含连续的示范阶段和之后的执行阶段")
     prefix = table.slice(0, stop)
     states = np.asarray(prefix["observation.state"].to_pylist(), dtype=float)
     return states, prefix["subtask_index"].to_numpy()
@@ -99,31 +99,34 @@ def summarize(episodes, budget):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--budget", type=int, default=24, help="Number of frames retained before decision")
+    parser.add_argument("--budget", type=int, default=24, help="每条轨迹在决策前保留的帧数")
+    parser.add_argument("--work-dir", type=Path, default=ROOT / ".local", help="数据缓存和实验输出目录")
     args = parser.parse_args()
     if args.budget < 1:
-        parser.error("--budget must be positive")
+        parser.error("--budget 必须是正整数")
+    work_dir = args.work_dir.resolve()
 
     with requests.Session() as session:
-        manifest = json.loads(cache_file(session, "meta/source_episodes.json").read_text(encoding="utf-8"))
-        labels = pq.read_table(cache_file(session, "meta/subtasks.parquet")).to_pylist()
+        manifest = json.loads(cache_file(session, work_dir, "meta/source_episodes.json").read_text(encoding="utf-8"))
+        labels = pq.read_table(cache_file(session, work_dir, "meta/subtasks.parquet")).to_pylist()
         names = {row["subtask_index"]: row["subtask"] for row in labels}
         episodes = []
         for row in manifest:
             if row["task"] not in TASKS:
                 continue
-            path = cache_file(session, f"data/chunk-000/file-{row['episode_index']:03d}.parquet")
+            name = f"data/chunk-000/file-{row['episode_index']:03d}.parquet"
+            path = cache_file(session, work_dir, name)
             table = pq.read_table(path, columns=["observation.state", "is_video_demo", "subtask_index"])
             states, label_indices = demonstration(table)
             references = reference_intervals(label_indices, names)
             if not references:
-                raise ValueError(f"No reference intervals for episode {row['episode_index']}")
+                raise ValueError(f"第 {row['episode_index']} 条轨迹缺少参考区间")
             episodes.append({**row, "decision_frame": len(states), "states": states, "references": references})
 
     if len(episodes) != 6:
-        raise ValueError(f"Expected six public development episodes, found {len(episodes)}")
+        raise ValueError(f"预实验需要六条公开开发轨迹，实际读取 {len(episodes)} 条")
     rows = summarize(episodes, args.budget)
-    output = ROOT / "runs" / "pilot" / f"budget_{args.budget}"
+    output = work_dir / "runs" / "pilot" / f"budget_{args.budget}"
     output.mkdir(parents=True, exist_ok=True)
     fields = ("task", "episode_index", "seed", "difficulty", "decision_frame", "method",
               "frames_kept", "reference_intervals", "covered_intervals")
@@ -139,7 +142,7 @@ def main():
         group = [row for row in rows if row["method"] == method]
         hits = sum(row["covered_intervals"] for row in group)
         total = sum(row["reference_intervals"] for row in group)
-        print(f"{method:12s} {hits}/{total} labelled intervals ({hits / total:.1%})")
+        print(f"{method:12s} 覆盖 {hits}/{total} 个标注区间（{hits / total:.1%}）")
     print(output)
 
 
