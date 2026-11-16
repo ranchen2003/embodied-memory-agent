@@ -1,0 +1,93 @@
+{
+  "source": "https://huggingface.co/datasets/lerobot/robomme/resolve/92796abbc67db4ea6447e5031d04bf47aa3770bb/",
+  "revision": "92796abbc67db4ea6447e5031d04bf47aa3770bb",
+  "fps": 10,
+  "coordinate_convention": "从零开始的前视像素坐标，依次为列和行。画面为 256×256。",
+  "note": "原版训练集定向选取目标发生位移的四条轨迹。保存示范到第一帧执行观测的因果前缀。已核对逐帧解码 RGB 哈希。历史锚点用于条件核验，当前正确位置只用于评分。",
+  "episodes": [
+    {
+      "episode_index": 311,
+      "local_file": "file-311.mp4",
+      "official_data_path": "data/chunk-000/file-215.parquet",
+      "official_front_video_path": "videos/image/chunk-000/file-003.mp4",
+      "official_front_video_from_timestamp": 482.6,
+      "fps": 10,
+      "frames": 735,
+      "first_execution_frame": 734,
+      "historical_xy_frame": 186,
+      "historical_xy": [
+        162,
+        124
+      ],
+      "current_xy": [
+        81,
+        140
+      ],
+      "decoded_rgb_sha256": "b64a3c48c422a95660e48682b186d6dd04c47e7fbb1a3977d9a4ffaf5dd18a94",
+      "http_range_bytes": 9497222
+    },
+    {
+      "episode_index": 335,
+      "local_file": "file-335.mp4",
+      "official_data_path": "data/chunk-000/file-239.parquet",
+      "official_front_video_path": "videos/image/chunk-000/file-003.mp4",
+      "official_front_video_from_timestamp": 2770.1,
+      "fps": 10,
+      "frames": 782,
+      "first_execution_frame": 781,
+      "historical_xy_frame": 506,
+      "historical_xy": [
+        86,
+        105
+      ],
+      "current_xy": [
+        160,
+        109
+      ],
+      "decoded_rgb_sha256": "56607075c099f24054cec4504975f538878d5bdd28b80d2b1d7fdc1606dd2153",
+      "http_range_bytes": 8448646
+    },
+    {
+      "episode_index": 1303,
+      "local_file": "file-1303.mp4",
+      "official_data_path": "data/chunk-001/file-065.parquet",
+      "official_front_video_path": "videos/image/chunk-000/file-018.mp4",
+      "official_front_video_from_timestamp": 708.9,
+      "fps": 10,
+      "frames": 1125,
+      "first_execution_frame": 1124,
+      "historical_xy_frame": 528,
+      "historical_xy": [
+        116,
+        142
+      ],
+      "current_xy": [
+        101,
+        115
+      ],
+      "decoded_rgb_sha256": "d0d3c06d9a4c1b50f3aefb81f2709f3c036517407cd135879d39979eb19d8a1f",
+      "http_range_bytes": 10854935
+    },
+    {
+      "episode_index": 1323,
+      "local_file": "file-1323.mp4",
+      "official_data_path": "data/chunk-001/file-085.parquet",
+      "official_front_video_path": "videos/image/chunk-000/file-018.mp4",
+      "official_front_video_from_timestamp": 3031.7,
+      "fps": 10,
+      "frames": 730,
+      "first_execution_frame": 729,
+      "historical_xy_frame": 199,
+      "historical_xy": [
+        103,
+        137
+      ],
+      "current_xy": [
+        167,
+        101
+      ],
+      "decoded_rgb_sha256": "7be8be01d822a01c1a52ae8b27d18b0b4fb5fdeeccaf87f2c67c2a9c968ab827",
+      "http_range_bytes": 7709207
+    }
+  ]
+}

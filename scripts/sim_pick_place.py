@@ -55,12 +55,13 @@ def save_rgb(observation, path):
 class PickPlaceCheck:
     """用公开末端位姿控制器闭环执行分阶段抓放并记录动作。"""
 
-    def __init__(self, env, directory, record, native_goal):
+    def __init__(self, env, directory, record, native_goal, *, record_oracle=True):
         self.env = env
         self.task = env.unwrapped
         self.directory = directory
         self.record = record
         self.native_goal = native_goal
+        self.record_oracle = record_oracle
         self.observation = None
         self.info = {}
         agent = self.task.agent
@@ -106,20 +107,25 @@ class PickPlaceCheck:
         joint_targets = as_array(solution.solutions[0, 0])
         action = np.r_[joint_targets, gripper].astype(np.float32)
         self.observation, _, terminated, truncated, self.info = self.env.step(action)
-        self.record["actions"].append({
+        action_record = {
             "stage": stage,
             "action": action.tolist(),
             "target_tcp_xyz": world_p.tolist(),
             "tcp_xyz": position(self.tcp).tolist(),
-            "cube_xyz": position(self.task.cube.pose).tolist(),
-            "grasped": flag(self.info["is_grasped"]),
-            "success": flag(self.info["success"]),
             "terminated": flag(terminated),
             "truncated": flag(truncated),
-        })
-        if flag(truncated) and not flag(self.info["success"]):
+        }
+        if self.record_oracle:
+            action_record.update(
+                cube_xyz=position(self.task.cube.pose).tolist(),
+                grasped=flag(self.info["is_grasped"]),
+                success=flag(self.info["success"]),
+            )
+        self.record["actions"].append(action_record)
+        success = self.record_oracle and flag(self.info["success"])
+        if flag(truncated) and not success:
             raise RuntimeError(f"{stage} 阶段用完允许的仿真控制步数。")
-        if flag(terminated) and not flag(self.info["success"]):
+        if self.record_oracle and flag(terminated) and not success:
             raise RuntimeError(f"{stage} 阶段仿真提前终止。")
 
     def move(self, stage, target_p, target_rotation, gripper):
@@ -150,12 +156,13 @@ class PickPlaceCheck:
             "stage": stage,
             "step": len(self.record["actions"]),
             "tcp_xyz": position(self.tcp).tolist(),
-            "cube_xyz": position(self.task.cube.pose).tolist(),
             "rgb": save_rgb(self.observation, self.directory / f"{stage}.png"),
         }
-        for key in ("is_grasped", "is_obj_placed", "is_robot_static", "success"):
-            if key in self.info:
-                stage_info[key] = flag(self.info[key])
+        if self.record_oracle:
+            stage_info["cube_xyz"] = position(self.task.cube.pose).tolist()
+            for key in ("is_grasped", "is_obj_placed", "is_robot_static", "success"):
+                if key in self.info:
+                    stage_info[key] = flag(self.info[key])
         self.record["stages"].append(stage_info)
 
     def run(self, seed):

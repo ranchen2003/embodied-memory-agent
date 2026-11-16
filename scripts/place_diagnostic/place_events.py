@@ -130,6 +130,13 @@ def read_placement(events, goal, anchor_interval, match_color=True):
     return eligible[rank - 1] if 0 < rank <= len(eligible) else None
 
 
+def read_relevant_recent(events, goal):
+    """相关性对照按目标颜色筛选，只用最近记录打破并列。"""
+    color, _, _ = goal_conditions(goal)
+    return max((event for event in events if event.color == color),
+               key=lambda event: event.release_frame, default=None)
+
+
 def retain_near_events(events, goal, length, budget):
     """将每次释放的两侧画面成对保留，其余容量覆盖剩余时段。"""
     color, _, _ = goal_conditions(goal)

@@ -13,7 +13,8 @@ import requests
 from offline_pilot import REVISION, ROOT, cache_file, select_frames
 from place_diagnostic.global_ring_tracking import global_associate
 from place_diagnostic.place_events import (
-    candidate_frame_indices, detect_placement, empty_closure_anchor, goal_conditions, read_placement, release_candidates,
+    candidate_frame_indices, detect_placement, empty_closure_anchor, goal_conditions, read_placement,
+    read_relevant_recent, release_candidates,
     retain_near_events, retain_release_pairs,
 )
 from place_diagnostic.ring_association import associate
@@ -98,10 +99,12 @@ def alternate_read(events, goal, anchor, reference):
     if changed == goal:
         raise ValueError("未生成预期的替换指令")
     chosen = read_placement(events, changed, anchor)
+    baseline = read_relevant_recent(events, changed)
     start, stop = desired["release_interval"]
     return {"goal": changed, "expected_interval": [start, stop],
             "selected": asdict(chosen) if chosen else None,
-            "correct": bool(chosen and start <= chosen.release_frame < stop)}
+            "correct": bool(chosen and start <= chosen.release_frame < stop),
+            "relevant_recent_correct": bool(baseline and start <= baseline.release_frame < stop)}
 
 
 def run_episode(session, work_dir, episode, reference, stride, task_goals):
@@ -145,7 +148,8 @@ def run_episode(session, work_dir, episode, reference, stride, task_goals):
     needs_anchor = goal_conditions(goal)[2] is not None
     anchor = empty_closure_anchor(states[:, 7], closing_opening, episode["control_freq"]) if needs_anchor else None
     annotated_anchor = reference["press_intervals"][0] if needs_anchor else None
-    selected = {"time_only": read_placement(events, goal, anchor, match_color=False),
+    selected = {"relevant_recent": read_relevant_recent(events, goal),
+                "time_only": read_placement(events, goal, anchor, match_color=False),
                 "color_and_time": read_placement(events, goal, anchor),
                 "known_button_anchor": read_placement(events, goal, annotated_anchor) if needs_anchor else None}
     start, end = reference["correct_release_interval"]
@@ -188,7 +192,7 @@ def summarize(rows):
                  "all_pairs": sum(row["retention"][str(budget)][method]["all_release_pairs"] for row in rows)}
         for method in rows[0]["retention"][str(budget)]} for budget in FRAME_BUDGETS}
     reader = {method: sum(row["reading"][method]["event_correct"] for row in rows)
-              for method in ("time_only", "color_and_time")}
+              for method in ("relevant_recent", "time_only", "color_and_time")}
     targets = {}
     for source in ("known_history_ring", "inferred_history_ring"):
         targets[source] = {}
@@ -205,6 +209,8 @@ def summarize(rows):
             "placement_detection": {key: sum(row["placement_detection"][key] for row in rows)
                                     for key in ("matched", "false_detections", "reference_total")},
             "placement_rgb_frames_scored": sum(row["placement_rgb_frames_scored"] for row in rows),
+            "paired_relevant_recent_correct": sum(row["reading"]["relevant_recent"]["event_correct"] and
+                                                  row["alternate"]["relevant_recent_correct"] for row in paired),
             "paired_event_correct": sum(row["reading"]["color_and_time"]["event_correct"] and
                                         row["alternate"]["correct"] for row in paired), "paired_total": len(paired),
             "localization_within_5px": targets}

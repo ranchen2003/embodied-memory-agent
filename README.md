@@ -37,6 +37,17 @@ python scripts/run_place_diagnostic.py --work-dir ../experiments --stride 2
 
 结果保存到 `../experiments/runs/place-diagnostic/stride_*/trace.json`，逐例记录保留帧、事件、时间条件、落点、候选排序和误差。
 
+在生成 `stride_1/trace.json` 后，可进一步比较单轨关联、换位片段关联和同预算回看。
+
+```powershell
+python scripts/run_exchange_memory.py --work-dir ../experiments --stride 2
+python scripts/run_exchange_memory.py --work-dir ../experiments --stride 4
+python scripts/run_exchange_memory.py --work-dir ../experiments --stride 12
+python scripts/run_exchange_memory.py --work-dir ../experiments --stride 2 --original-manifest ../experiments/data/original-displaced/manifest.json
+```
+
+原版定向核验需要按 `configs/original_displaced_manifest.json` 提取的四段公开前视视频。本机将清单和视频保存在 `../experiments/data/original-displaced/`。清单记录源视频、起始时间、帧数和解码哈希。Plus 开发诊断和原版定向压力核验分别输出到 `../experiments/runs/exchange-memory/`，评价口径见[本阶段结果](docs/first-month-results.md)。
+
 ## Windows 单环境仿真验证
 
 `scripts/check_local_sim.py` 在 ManiSkill 的 `PickCube-v1` 上重置 Panda 环境，发送关节指令并检查新观测和实际关节位移。验证配置使用 ManiSkill 3.0.1、SAPIEN 3.0.3、CPU 物理仿真和 CPU 图像读回。实验环境位于 `../experiments/envs/maniskill-win`，命令从源码仓库根目录运行。
@@ -52,4 +63,10 @@ python scripts/run_place_diagnostic.py --work-dir ../experiments --stride 2
 ```powershell
 ..\experiments\envs\maniskill-win\Scripts\python.exe scripts/sim_pick_place.py --output ../experiments/runs/local-pick-place
 ..\experiments\envs\maniskill-win\Scripts\python.exe scripts/sim_pick_place.py --native-goal --output ../experiments/runs/local-pick-place/native
+```
+
+视觉桌面测试从可见红方块和绿球的 RGB-D 观测生成抓取和放置坐标。可直接保存两个调试场景和两个固定配置后的验证场景的回放。
+
+```powershell
+..\experiments\envs\maniskill-win\Scripts\python.exe scripts/sim_visual_pick_place.py --seeds 0 1 2 3 --record-video --output ../experiments/runs/visual-pick-place
 ```
