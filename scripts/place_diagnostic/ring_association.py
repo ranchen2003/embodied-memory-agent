@@ -42,13 +42,24 @@ def associate(
 
     source_xy 是调用方指定的历史证据点。最后一帧是当前观察，成本越低越优先。
     """
-    if not 0 <= source_index < len(frames) or beam_width < 1:
-        raise ValueError("source_index 或 beam_width 无效")
+    if not 0 <= source_index < len(frames):
+        raise ValueError("source_index 无效")
+    detections = [detect_rings(frame) for frame in frames[source_index:]]
+    return associate_detections(detections, source_index, source_xy, beam_width)
+
+
+def associate_detections(
+    detections: Sequence[np.ndarray],
+    source_index: int,
+    source_xy: Sequence[float],
+    beam_width: int = 4,
+) -> dict:
+    """用以起始帧开头的中心点序列关联目标，便于复用相同的跟踪对照。"""
     source_xy = np.asarray(source_xy, dtype=float)
     if source_xy.shape != (2,) or not np.isfinite(source_xy).all():
         raise ValueError("source_xy 需提供有限的 (x, y) 坐标")
-
-    detections = [detect_rings(frame) for frame in frames[source_index:]]
+    if not len(detections) or source_index < 0 or beam_width < 1:
+        raise ValueError("中心点序列、source_index 或 beam_width 无效")
     source, current = detections[0], detections[-1]
     origin = source_xy
     if len(source):

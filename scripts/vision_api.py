@@ -11,7 +11,7 @@ import requests
 
 
 class VisionAPI:
-    def __init__(self, endpoint, model, api_key=None, max_calls=20, max_tokens=384):
+    def __init__(self, endpoint, model, api_key=None, max_calls=20, max_tokens=384, *, thinking=None):
         url = urlsplit(endpoint)
         if url.scheme not in {"http", "https"} or not url.hostname or url.username or url.password or url.query or url.fragment:
             raise ValueError("端点应是不含凭据和查询参数的 HTTP(S) 地址")
@@ -24,6 +24,7 @@ class VisionAPI:
         self.model = model
         self.max_calls = max_calls
         self.max_tokens = max_tokens
+        self.thinking = thinking
         self.calls = 0
         self.last_usage = {}
         self.last_call = {}
@@ -51,6 +52,8 @@ class VisionAPI:
         payload = {"model": self.model, "temperature": 0, "max_tokens": self.max_tokens,
                    "response_format": {"type": "json_object"},
                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": items}]}
+        if self.thinking is not None:
+            payload["thinking"] = {"type": "enabled" if self.thinking else "disabled"}
         self.last_usage = {}
         self.calls += 1
         started = perf_counter()

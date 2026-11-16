@@ -30,4 +30,4 @@
 | 第 3 周 | 固定记忆内容，实现按键前后和操作次序查询。比较时间条件读取与相关性读取，分开测依据与正确目标。 | 一个可复查的历史错选案例，以及第一组读取对照。 |
 | 第 4 周 | 固定预实验配置和标注口径，复跑结果，整理记录并准备组会展示。确认正式执行器的运行条件与实测回合开销。 | 一段回放、两组过程指标、一次执行接口验证记录。 |
 
-正式系统的执行器首选冻结的 GroundSG π0.5。高层生成带定位的子目标，执行器输出关节动作。公开的完整三层方案部署于两张 NVIDIA GPU。本机先完成离线研究及单环境兼容性验证，再按实测选择全量执行方式。[官方执行代码](https://github.com/RoboMME/robomme_benchmark/blob/main/scripts/plus_eval/3-tier-astra/eval_plus.py#L233-L256) · [部署说明](https://raw.githubusercontent.com/RoboMME/robomme_benchmark/main/scripts/plus_eval/3-tier-astra/README.md)
+GroundSG π0.5 与基于公开 RGB-D 的位姿执行是两种候选，需在官方训练回合上比较可执行性、接口和资源开销。[本轮数据、方法和执行进展](first-month-progress.md) · [两个候选的接口和部署](execution-candidates.md)
