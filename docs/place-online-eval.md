@@ -27,3 +27,18 @@ python scripts/run_plus_place_online.py \
 入口在重置前检查环境实际使用的 SAPIEN 渲染设备，报告设备名称、渲染后端和物理后端。GPU 判定依赖渲染器的 CUDA 设备和 `can_render()`，不能用 `torch.cuda.is_available()` 代替。`--allow-cpu-render-diagnostic` 可标记本机 CPU 渲染联调，运行记录应独立保存。原生 Linux 的 GPU 支持与 WSL2 的渲染限制见[ManiSkill 支持矩阵](https://maniskill.readthedocs.io/en/latest/user_guide/getting_started/installation.html#system-support)。
 
 在六条真实公开存档回放中，相同入口的目标像素命中为 `current` 2/6、`uniform` 6/6、`complete` 6/6。两种有记忆的配置都读对了六次历史事件，所引用的图像均在各自 512 帧预算内。该结果支持核查历史观测是否帮助目标选择，当前容量下还未观察到事件优先保留优于均匀保留。以上是目标选择的存档回放结果。执行效果以真实在线回合的独立结果为准。
+
+
+## 图像预算的离线检查
+
+沿用上述接口，在同六条公开训练存档上固定指令、截点、夹爪数据和定位逻辑，仅比较图像保留方式。统计为历史事件正确、当前目标正确，分母均为 6。命中阈值为 5 像素，评分标签在决策后使用。
+
+| 历史前视帧预算 | 均匀保留，事件／目标 | 事件优先保留，事件／目标 |
+| ---: | ---: | ---: |
+| 16 | 0／0 | 0／0 |
+| 32 | 0／0 | 4／0 |
+| 64 | 1／0 | 6／1 |
+| 128 | 3／2 | 6／2 |
+| 512 | 6／6 | 6／6 |
+
+在 64 帧时，事件优先组已定位全部历史事件，当前目标只命中 1 条。128 帧也有类似差距。前后证据的保留和跨帧身份关联在低预算下需要分别检查。逐条结果见 `../experiments/runs/place-ablation/history-budget-check.json`。
