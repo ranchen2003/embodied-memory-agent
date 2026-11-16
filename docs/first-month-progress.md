@@ -32,3 +32,18 @@ python scripts/run_grounded_place_replay.py --work-dir ../experiments --output .
 ## 仿真和两种执行候选
 
 共用子目标包含操作、物体、当前相机的目标位置及对应的历史证据。基准执行可分别试用公开 RGB-D 与校准生成位姿的路线，或复用 GroundSG 接收定位子目标并输出关节动作的路线。执行器选择以同一已知目标的完成情况、覆盖和资源开销为依据。对第 32 条公开视频已根据官方 H5 验证像素可反投影，尚需在在线回合核验动作结果。[执行器部署与预检](execution-candidates.md)
+
+
+## 本机 GPU 推理与官方仿真预检
+
+Windows 原生 `llama.cpp` 指定 `Vulkan1`，设备为 RTX 5060 Laptop。加载 Qwen2.5-VL-3B Q4 和视觉投影后，NVIDIA 显存从 12 MiB 变为 3,618 MiB。相同六条开发轨迹均完成本机图文请求，模型读取与换位定位组合的历史事件及目标同时正确为 2/6。同条件规则读取与换位定位为 6/6。两组结果用于分析模型证据读取，测量对象是固定轨迹，数据位置为 `../experiments/runs/place-ablation/qwen-vulkan-s2/`。
+
+运行前用 `llama-server --list-devices` 确认 NVIDIA 对应编号，并在本机模型服务启动参数中显式指定设备。例如本机运行时使用 `--device Vulkan1 --gpu-layers 99 --ctx-size 8192`。模型服务监听 `127.0.0.1:17864`，模型别名为 `qwen25vl3b`。然后在仓库根目录执行如下命令。
+
+```powershell
+python scripts/run_grounded_place_replay.py --work-dir ../experiments --output ../experiments/runs/place-ablation/qwen-replay-01 --local-vision
+```
+
+官方 Plus 固定提交 `777c595d9c443405fdc145452929bc5890c13e19` 在 Ubuntu 22.04 WSL2 中实际重置了 `VideoPlaceButton` 的公开训练回合 2。使用本机副本的 CPU 渲染配置获取 2,006 帧，读取前视 RGB-D 并把目标反投影到世界坐标，发送原位 waypoint 后环境仍处于 `ongoing`、未报告动作错误。该动作占 7 个控制步。日志在 `../experiments/runs/plus-preflight/wsl-video-place-button-2-cpu-render.log`。
+
+原生 Windows 的 SAPIEN 3.0.3 可在 RTX 5060 上渲染，官方任务还依赖无 Windows 轮子的 MPLib 0.1.1。WSL2 的 CUDA 可见，但当前 SAPIEN 3.0.2 只枚举到软件 Vulkan 渲染设备。正式 GPU 批跑应在支持该渲染栈的环境上复核。WSL2 的回合结果属于本机联调。[ManiSkill 平台支持](https://maniskill.readthedocs.io/en/v3.0.0b20/user_guide/getting_started/installation.html#system-support) · [MPLib 0.1.1 发行文件](https://pypi.org/project/mplib/0.1.1/#files)

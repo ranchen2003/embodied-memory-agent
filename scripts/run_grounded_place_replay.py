@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 from time import perf_counter
+from urllib.parse import urlsplit
 
 import numpy as np
 import pyarrow.parquet as pq
@@ -19,7 +20,7 @@ from vision_api import VisionAPI
 TASKS = {"VideoPlaceButton", "VideoPlaceOrder"}
 
 
-def run_episode(work, entry, stride, model):
+def run_episode(work, entry, stride, model, model_reader):
     index = entry["episode_index"]
     cutoff = entry["first_execution_frame"]
     relative = f"chunk-000/file-{index:03d}"
@@ -31,7 +32,8 @@ def run_episode(work, entry, stride, model):
         raise ValueError(f"第 {index} 条的示范与决策截点未对齐")
     states = np.asarray(table["observation.state"].slice(0, cutoff).to_pylist())
     frames = read_prefix(video, cutoff)
-    return grounded_place(frames, states[:, 7], entry["instruction"], entry["control_freq"], stride, model)
+    return grounded_place(frames, states[:, 7], entry["instruction"], entry["control_freq"], stride, model,
+                          model_reader=model_reader)
 
 
 def score(predictions, reference):
@@ -51,12 +53,20 @@ def main():
     parser.add_argument("--work-dir", type=Path, required=True, help="实验数据根目录")
     parser.add_argument("--output", type=Path, required=True, help="新建的决策记录目录")
     parser.add_argument("--stride", type=int, default=2, help="共同使用的跟踪采样间隔")
-    parser.add_argument("--deepseek", action="store_true", help="显式启用 DeepSeek 图文读取对照")
+    methods = parser.add_mutually_exclusive_group()
+    methods.add_argument("--deepseek", action="store_true", help="显式启用 DeepSeek 图文读取对照")
+    methods.add_argument("--local-vision", action="store_true", help="使用只监听本机的图文模型服务")
+    parser.add_argument("--local-endpoint", default="http://127.0.0.1:17864", help="本机图文模型监听地址")
+    parser.add_argument("--local-model", default="qwen25vl3b", help="本机图文模型名称")
     parser.add_argument("--reference", type=Path, default=ROOT / "configs/reference_places.json", help="仅用于评分的标签")
     args = parser.parse_args()
     key = os.getenv("DEEPSEEK_API_KEY") if args.deepseek else None
     if args.deepseek and not key:
         parser.error("启用 DeepSeek 时需要本机环境变量 DEEPSEEK_API_KEY")
+    if args.local_vision:
+        endpoint = urlsplit(args.local_endpoint)
+        if endpoint.scheme != "http" or endpoint.hostname not in {"127.0.0.1", "::1", "localhost"}:
+            parser.error("本机图文对照仅允许环回 HTTP 地址")
     if args.stride < 1 or args.output.exists():
         parser.error("已存在的输出目录须保留，帧间隔须为正数")
     manifest = json.loads((args.work_dir / "data/plus-agent-coverage/coverage.json").read_text(encoding="utf-8"))
@@ -68,15 +78,21 @@ def main():
     if {row["episode_index"] for row in episodes} != references.keys() or len(episodes) != 6:
         parser.error("需要两个任务的全部 6 条公开训练回合及评分标签")
     args.output.mkdir(parents=True)
-    client = VisionAPI("https://api.deepseek.com/chat/completions", "deepseek-flash", key,
-                       max_calls=len(episodes), max_tokens=128, thinking=False) if args.deepseek else None
+    client = None
+    model_reader = "deepseek"
+    if args.deepseek:
+        client = VisionAPI("https://api.deepseek.com/chat/completions", "deepseek-flash", key,
+                           max_calls=len(episodes), max_tokens=128, thinking=False)
+    if args.local_vision:
+        client = VisionAPI(args.local_endpoint, args.local_model, max_calls=len(episodes), max_tokens=128)
+        model_reader = "local_vision"
     results = []
     totals = defaultdict(lambda: {"episodes": 0, "event_correct": 0, "target_correct": 0, "both_correct": 0})
     try:
         for row in episodes:
             started = perf_counter()
             calls_before = client.calls if client is not None else 0
-            result = run_episode(args.work_dir, row, args.stride, client)
+            result = run_episode(args.work_dir, row, args.stride, client, model_reader)
             score(result["decision"], references[row["episode_index"]])
             result.update(episode_index=row["episode_index"], task=row["task"],
                           seed=row["seed"], elapsed_seconds=round(perf_counter() - started, 3))
@@ -97,6 +113,8 @@ def main():
                "episodes": [item["episode_index"] for item in results], "target_tolerance_pixels": 5,
                "deepseek": "deepseek-flash" if args.deepseek else None,
                "results": totals}
+    if args.local_vision:
+        summary["local_vision"] = args.local_model
     (args.output / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 

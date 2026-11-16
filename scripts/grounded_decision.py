@@ -34,7 +34,7 @@ def choose_with_model(client, goal, anchor, events, frames):
     if event_id is None and "event_id" in result:
         return None
     if type(event_id) is not int or not 0 <= event_id < len(events):
-        raise ValueError("DeepSeek 返回了记忆候选范围以外的事件编号")
+        raise ValueError("模型返回了记忆候选范围以外的事件编号")
     return events[event_id]
 
 
@@ -74,7 +74,7 @@ def ring_localizers(frames, stride):
     return locate, len(ids)
 
 
-def grounded_place(frames, aperture, goal, fps, stride, model=None):
+def grounded_place(frames, aperture, goal, fps, stride, model=None, *, model_reader="deepseek"):
     """只使用已看到的相机和夹爪观测，分别返回两个读法和两个定位法的结果。"""
     cutoff = len(frames) - 1
     if cutoff < 1 or len(aperture) != cutoff or stride < 1:
@@ -88,10 +88,10 @@ def grounded_place(frames, aperture, goal, fps, stride, model=None):
                "object_and_time": read_placement(events, goal, anchor)}
     model_error = None
     if model is not None:
-        readers["deepseek"] = None
+        readers[model_reader] = None
         if events:
             try:
-                readers["deepseek"] = choose_with_model(model, goal, anchor, events, frames)
+                readers[model_reader] = choose_with_model(model, goal, anchor, events, frames)
             except (RuntimeError, ValueError) as error:
                 model_error = {"type": type(error).__name__, "message": str(error)}
     locate, frame_count = ring_localizers(frames, stride)
