@@ -114,7 +114,7 @@ class VisualPickPlace(PickPlaceCheck):
         super().step(stage, world_p, world_rotation, gripper)
         self.video_frame()
 
-    def run(self, seed, record_video=False):
+    def prepare(self, seed, record_video=False):
         self.env.reset(seed=seed)
         configure_visible_goal(self.task, seed)
         self.observation = self.task.get_obs()
@@ -132,7 +132,9 @@ class VisualPickPlace(PickPlaceCheck):
         cube, edges, cube_report = locate_cube(self.observation)
         goal, goal_report = locate_goal(self.observation)
         self.record["perception"] = {"cube": cube_report, "goal": goal_report}
+        return cube, edges, goal
 
+    def pick(self, cube, edges):
         current_closing = orientation(self.tcp).as_matrix()[:, 1]
         candidates = np.concatenate((edges, -edges))
         closing = candidates[np.argmax(candidates @ current_closing)]
@@ -151,9 +153,12 @@ class VisualPickPlace(PickPlaceCheck):
 
         # 动作只使用视觉定位和机械臂本体观测。物体被遮挡时沿用抓取时的估计。
         grasp_offset = cube - position(self.tcp)
-        target_tcp = goal - grasp_offset
         self.move("lift", cube + LIFT, grasp_rotation, CLOSED)
         self.checkpoint("03_lift")
+        return grasp_offset, grasp_rotation
+
+    def place(self, goal, grasp_offset, grasp_rotation):
+        target_tcp = goal - grasp_offset
         self.move("transfer", target_tcp + LIFT, grasp_rotation, CLOSED)
         self.checkpoint("04_above_target")
         self.move("descend", target_tcp, grasp_rotation, CLOSED)
@@ -162,6 +167,11 @@ class VisualPickPlace(PickPlaceCheck):
         self.move("retreat", target_tcp + LIFT, grasp_rotation, OPEN)
         self.hold("settle", target_tcp + LIFT, grasp_rotation, OPEN, 5)
         self.checkpoint("06_retreat")
+
+    def run(self, seed, record_video=False):
+        cube, edges, goal = self.prepare(seed, record_video)
+        grasp_offset, rotation = self.pick(cube, edges)
+        self.place(goal, grasp_offset, rotation)
 
 
 def evaluate(env):

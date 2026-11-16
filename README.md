@@ -1,6 +1,6 @@
 # 具身智能体任务记忆实验
 
-课题为《基于记忆增强的具身智能体任务决策方法研究与实现》。当前入口用于检查机械臂示范历史的保留情况。运行只需要 Python 和 CPU。
+课题为《基于记忆增强的具身智能体任务决策方法研究与实现》。项目包含公开轨迹诊断、本机视觉模型闭环和 RoboMME-Plus 评测入口。
 
 ## 从本机运行
 
@@ -70,3 +70,7 @@ python scripts/run_exchange_memory.py --work-dir ../experiments --stride 2 --ori
 ```powershell
 ..\experiments\envs\maniskill-win\Scripts\python.exe scripts/sim_visual_pick_place.py --seeds 0 1 2 3 --record-video --output ../experiments/runs/visual-pick-place
 ```
+
+## 模型调用和官方评测接口
+
+本机图文模型、仿真 Agent、训练检查点及对照方法见[视觉语言模型与机械臂闭环](docs/agent-benchmark.md)。
