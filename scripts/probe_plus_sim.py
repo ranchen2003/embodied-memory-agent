@@ -1,13 +1,28 @@
 """启动官方训练回合，核查公开 RGB-D、标定和位姿执行入口。"""
 
 from argparse import ArgumentParser
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import sys
+from time import perf_counter
 
 import numpy as np
 
 from plus_waypoint import ground_pixel, waypoint
+
+
+@contextmanager
+def measure(report, name):
+    """逐段记录真实墙钟时间，不改变环境或控制步骤。"""
+    start = perf_counter()
+    print(f"开始诊断阶段：{name}", file=sys.stderr, flush=True)
+    try:
+        yield
+    finally:
+        elapsed = perf_counter() - start
+        report.setdefault("timings_s", {})[name] = round(elapsed, 4)
+        print(f"完成诊断阶段：{name}，耗时 {elapsed:.2f} 秒", file=sys.stderr, flush=True)
 
 
 def check_environment(task, episode, pixel, send_hold):
@@ -18,19 +33,29 @@ def check_environment(task, episode, pixel, send_hold):
 
 
 def probe_episode(builder, episode, pixel, send_hold):
+    started = perf_counter()
     report = {"task": builder.env_id, "split": "train", "episode": episode,
               "episode_count": builder.get_episode_num(), "max_control_steps": builder.episode_max_steps(episode)}
     environment = None
     stage = "make_env"
     try:
-        environment = builder.make_env_for_episode(
-            episode,
-            include_front_depth=True,
-            include_front_camera_extrinsic=True,
-            include_front_camera_intrinsic=True,
-        )
+        with measure(report, stage):
+            environment = builder.make_env_for_episode(
+                episode,
+                include_front_depth=True,
+                include_front_camera_extrinsic=True,
+                include_front_camera_intrinsic=True,
+            )
+        backend = getattr(environment.unwrapped, "backend", None)
+        device = getattr(backend, "render_device", None)
+        if device is not None:
+            report["render_device"] = {
+                "name": device.name, "is_cuda": device.is_cuda(),
+                "can_render": device.can_render(),
+            }
         stage = "reset"
-        observation, info = environment.reset()
+        with measure(report, stage):
+            observation, info = environment.reset()
         if info.get("status") in {"error", "fail"}:
             raise RuntimeError("环境初始化失败")
         stage = "observation"
@@ -48,7 +73,8 @@ def probe_episode(builder, episode, pixel, send_hold):
             measured_opening = float(np.sum(observation["gripper_state_list"][-1]))
             grip = 1 if measured_opening >= 0.04 else -1
             action = waypoint(pose[:3], pose[3:], grip)
-            _, _, terminated, truncated, feedback = environment.step(action)
+            with measure(report, stage):
+                _, _, terminated, truncated, feedback = environment.step(action)
             report.update(hold_waypoint=action.tolist(), waypoint_status=feedback.get("status"),
                           waypoint_action_error=bool(feedback.get("action_error", False)),
                           control_steps=int(feedback.get("execution_total_control_steps", 0)))
@@ -59,7 +85,9 @@ def probe_episode(builder, episode, pixel, send_hold):
         report.update(ok=False, error_stage=stage, error_type=type(error).__name__, error_message=str(error))
     finally:
         if environment is not None:
-            environment.close()
+            with measure(report, "close"):
+                environment.close()
+        report.setdefault("timings_s", {})["episode_probe_total"] = round(perf_counter() - started, 4)
     return report
 
 

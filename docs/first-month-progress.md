@@ -47,3 +47,11 @@ python scripts/run_grounded_place_replay.py --work-dir ../experiments --output .
 官方 Plus 固定提交 `777c595d9c443405fdc145452929bc5890c13e19` 在 Ubuntu 22.04 WSL2 中实际重置了 `VideoPlaceButton` 的公开训练回合 2。使用本机副本的 CPU 渲染配置获取 2,006 帧，读取前视 RGB-D 并把目标反投影到世界坐标，发送原位 waypoint 后环境仍处于 `ongoing`、未报告动作错误。该动作占 7 个控制步。日志在 `../experiments/runs/plus-preflight/wsl-video-place-button-2-cpu-render.log`。
 
 原生 Windows 的 SAPIEN 3.0.3 可在 RTX 5060 上渲染，官方任务还依赖无 Windows 轮子的 MPLib 0.1.1。WSL2 的 CUDA 可见，但当前 SAPIEN 3.0.2 只枚举到软件 Vulkan 渲染设备。正式 GPU 批跑应在支持该渲染栈的环境上复核。WSL2 的回合结果属于本机联调。[ManiSkill 平台支持](https://maniskill.readthedocs.io/en/v3.0.0b20/user_guide/getting_started/installation.html#system-support) · [MPLib 0.1.1 发行文件](https://pypi.org/project/mplib/0.1.1/#files)
+
+## CPU 计时与 Windows 兼容性复核
+
+2026-11-16 对同一公开训练回合追加分阶段墙钟计时。WSL2 软件渲染配置下，环境创建 43.289 秒、重置并生成 2,006 帧前置示范 207.770 秒、一次原位 waypoint 的 7 个控制步 0.701 秒，含关闭的诊断总计 252.073 秒。仅测量一次，运行中还有轻量依赖核查；它反映当前配置下的诊断耗时，不能当作完整任务、模型推理或整套基准的性能结果。JSON 与日志位于 `../experiments/runs/plus-preflight/wsl-cpu-timing-20261116.*`。
+
+Windows 原生完整入口实测在创建环境时缺少 MPLib。进一步的隔离试验加载了官方锁定 ManiSkill 3.0.0b21 的 Python 源码，尝试由 Windows SAPIEN 3.0.3 负责 GPU 渲染，通过本机持久进程调用 WSL 中的原版 MPLib 0.1.1。该试验保留官方示范生成和动作执行代码，未替换规划算法。进程在创建环境阶段以 `0xC0000005` 退出，没有完成 reset，未生成正式结果。具体底层崩溃点尚未定位。相关源码、日志和退出状态单独归档为兼容性诊断，不计入任务成功率；事后核查无该规划服务残留。
+
+GPU 闭环验证仍未完成。已核查 AutoDL 的 headless Vulkan 官方说明并形成部署草稿，尚未租用或部署实例；按用户最新安排，暂不推进 AutoDL。后续确定可用 GPU 环境后，需依次核查 NVIDIA 设备、相机出图、官方回合重置与动作、完整抓放。公开数据上的回放结果与真实在线任务结果分别报告。[AutoDL Vulkan 配置](https://www.autodl.com/docs/vulkan/)
