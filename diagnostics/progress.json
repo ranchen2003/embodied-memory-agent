@@ -1,0 +1,22 @@
+{
+  "stage": "official benchmark GPU render and known-target execution",
+  "upstream_revision": "59455f504abdf2502ceb747919969e7dcc8abee2",
+  "task": "VideoPlaceButton",
+  "split": "train",
+  "episode": 0,
+  "seed": 1155046303,
+  "action_space": "waypoint",
+  "public_target_annotations": "https://robomme.github.io/video/plus/VideoPlaceButton/sample-1.subgoals.json",
+  "vulkan_status": "NVIDIA GeForce RTX 4080 SUPER enumerated as a discrete device",
+  "vulkan_log": "/root/autodl-tmp/embodied-runtime/logs/vulkan-summary.log",
+  "dependency_log": "/root/autodl-tmp/embodied-runtime/logs/uv-sync.log",
+  "gpu_command": "bash /root/autodl-tmp/workspace/diagnostics/run_phase1.sh gpu-01 --gpu-only",
+  "grasp_command": "bash /root/autodl-tmp/workspace/diagnostics/run_phase1.sh grasp-01",
+  "results_root": "/root/autodl-tmp/embodied-runtime/runs",
+  "issues": [
+    "Private repository is accessible with the GitHub connector; direct AutoDL HTTPS Git is unauthenticated.",
+    "Vulkan loader was absent. Ubuntu mirror packages were unpacked on the data disk and a data-disk EGL ICD was used.",
+    "The public pixels allow first-stage execution without the complete H5. The H5 download was interrupted and the partial file can be resumed in the data phase."
+  ],
+  "next": "After pinned simulator dependencies finish, require actual CUDA RGB-D before evaluating waypoint execution."
+}
